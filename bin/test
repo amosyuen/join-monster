@@ -1,8 +1,6 @@
 #!/bin/bash
 set -e
 
-export TZ=UTC
-
 GREEN='\033[102m'
 BLUE='\033[104m'
 YELLOW='\033[33m'
