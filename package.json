@@ -26,7 +26,7 @@
     "test-keyset-paging": "cross-env NODE_ENV=test PAGINATE=keyset TZ=UTC ava test/pagination/keyset-paging.js",
     "coverage": "nyc --reporter=html npm run test",
     "lint": "eslint src test",
-    "start": "babel-watch ./test-api/server.js",
+    "start": "cross-env-shell DB=PG babel-watch ./test-api/server.js",
     "docs": "mkdocs serve",
     "jsdoc": "babel src/index.js -o temp.js && (jsdoc2md temp.js | sed '/\\*\\*Kind\\*\\*:/d' > docs/API.md) && rm temp.js",
     "prepublishOnly": "bash ./scripts/prepublish.sh && npm run build",
