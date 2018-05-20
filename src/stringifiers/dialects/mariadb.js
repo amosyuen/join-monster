@@ -22,8 +22,8 @@ ${unions.join('\nUNION\n')}
 function paginatedSelect(expressions, table, as, whereConditions, order, limit, offset, opts = {}) {
   const { extraJoin, withTotal } = opts
   as = quote(as)
-  const selections = [ `${as}.*`, ...expressions.map(expr => `${expr.expr} AS ${expr.as}`) ].join(',\n  ')
-  order = orderColumnsToString(order.columns, quote, order.table)
+  const selections = [ `${as}.*`, ...new Set(expressions.map(expr => `${expr.expr} AS ${quote(expr.as)}`)) ].join(',\n  ')
+  order = orderColumnsToString(order, quote)
   return `\
   (SELECT ${selections}${withTotal ? `,\n  count(*) OVER () AS ${quote('$total')}` : ''}
   FROM ${table} ${as}
@@ -49,7 +49,7 @@ const dialect = module.exports = {
   handlePaginationAtRoot: async function(parent, node, context, expressions, tables) {
     const pagingWhereConditions = []
     if (node.sortKey) {
-      const { limit, order, whereCondition: whereAddendum } = interpretForKeysetPaging(node, dialect)
+      const { limit, order, whereCondition: whereAddendum } = interpretForKeysetPaging(node, dialect, expressions)
       pagingWhereConditions.push(whereAddendum)
       if (node.where) {
         pagingWhereConditions.push(
@@ -60,7 +60,7 @@ const dialect = module.exports = {
         keysetPagingSelect(expressions, node.name, pagingWhereConditions, order, limit, node.as, { q: quote })
       )
     } else if (node.orderBy) {
-      const { limit, offset, order } = interpretForOffsetPaging(node, dialect)
+      const { limit, offset, order } = interpretForOffsetPaging(node, dialect, expressions)
       if (node.where) {
         pagingWhereConditions.push(
           await node.where(`${quote(node.as)}`, node.args || {}, context, node)
@@ -80,7 +80,7 @@ const dialect = module.exports = {
       )
     }
     if (node.sortKey) {
-      const { limit, order, whereCondition: whereAddendum } = interpretForKeysetPaging(node, dialect)
+      const { limit, order, whereCondition: whereAddendum } = interpretForKeysetPaging(node, dialect, expressions)
       pagingWhereConditions.push(whereAddendum)
       const unions = batchScope.map(val => {
         let whereConditions = [ ...pagingWhereConditions, `${quote(node.as)}.${quote(node.sqlBatch.thisKey.name)} = ${val}` ]
@@ -89,7 +89,7 @@ const dialect = module.exports = {
       })
       tables.push(joinUnions(unions, node.as))
     } else if (node.orderBy) {
-      const { limit, offset, order } = interpretForOffsetPaging(node, dialect)
+      const { limit, offset, order } = interpretForOffsetPaging(node, dialect, expressions)
       const unions = batchScope.map(val => {
         let whereConditions = [ ...pagingWhereConditions, `${quote(node.as)}.${quote(node.sqlBatch.thisKey.name)} = ${val}` ]
         whereConditions = filter(whereConditions).join(' AND ') || '1'
@@ -120,7 +120,7 @@ const dialect = module.exports = {
       }
     }
     if (node.sortKey || node.junction.sortKey) {
-      const { limit, order, whereCondition: whereAddendum } = interpretForKeysetPaging(node, dialect)
+      const { limit, order, whereCondition: whereAddendum } = interpretForKeysetPaging(node, dialect, expressions)
       pagingWhereConditions.push(whereAddendum)
       const unions = batchScope.map(val => {
         let whereConditions = [
@@ -134,7 +134,7 @@ const dialect = module.exports = {
       })
       tables.push(joinUnions(unions, node.junction.as))
     } else if (node.orderBy || node.junction.orderBy) {
-      const { limit, offset, order } = interpretForOffsetPaging(node, dialect)
+      const { limit, offset, order } = interpretForOffsetPaging(node, dialect, expressions)
       const unions = batchScope.map(val => {
         let whereConditions = [
           ...pagingWhereConditions,
